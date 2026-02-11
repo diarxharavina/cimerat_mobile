@@ -12,7 +12,7 @@ export default function Home() {
       </Text>
 
       <Pressable
-        onPress={() => router.push("/auth")}
+        onPress={() => router.push("/(auth)/login")}
         style={{ marginTop: 16, backgroundColor: "#1E4E8C", paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12 }}
       >
         <Text style={{ color: "white", fontWeight: "800" }}>Get started</Text>
