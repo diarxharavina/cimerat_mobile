@@ -1,22 +1,35 @@
-import { View, Text, Pressable } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
+import AppButton from "../src/components/AppButton";
+import AppText from "../src/components/AppText";
+import { colors } from "../src/theme/colors";
 
 export default function Home() {
   const router = useRouter();
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
-      <Text style={{ fontSize: 28, fontWeight: "800" }}>Cimerat</Text>
-      <Text style={{ marginTop: 8, opacity: 0.7, textAlign: "center" }}>
-        Roommates, without arguments.
-      </Text>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 24,
+      }}
+    >
+      <AppText weight="bold" style={{ fontSize: 30, color: colors.text }}>
+        Cimerat
+      </AppText>
 
-      <Pressable
+      <AppText style={{ marginTop: 10, opacity: 0.7, textAlign: "center" }}>
+        Roommates, without arguments.
+      </AppText>
+
+      <AppButton
+        title="Get started"
         onPress={() => router.push("/(auth)/login")}
-        style={{ marginTop: 16, backgroundColor: "#1E4E8C", paddingVertical: 12, paddingHorizontal: 18, borderRadius: 12 }}
-      >
-        <Text style={{ color: "white", fontWeight: "800" }}>Get started</Text>
-      </Pressable>
+        style={{ marginTop: 18, alignSelf: "stretch" }}
+      />
     </View>
   );
 }

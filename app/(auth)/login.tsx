@@ -1,5 +1,8 @@
-import { View, Text, Pressable } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
+import AppButton from "../../src/components/AppButton";
+import AppText from "../../src/components/AppText";
+import { colors } from "../../src/theme/colors";
 
 export default function Login() {
   const router = useRouter();
@@ -8,27 +11,25 @@ export default function Login() {
     <View
       style={{
         flex: 1,
+        backgroundColor: colors.background,
         justifyContent: "center",
         alignItems: "center",
         padding: 24,
       }}
     >
-      <Text style={{ fontSize: 24, fontWeight: "800" }}>Login</Text>
+      <AppText weight="bold" style={{ fontSize: 24, color: colors.text }}>
+        Login
+      </AppText>
 
-      <Pressable
+      <AppText style={{ marginTop: 10, opacity: 0.7, textAlign: "center" }}>
+        Apple / Google / Email will be added soon.
+      </AppText>
+
+      <AppButton
+        title="Continue (Mock Login)"
         onPress={() => router.replace("/(app)/dashboard")}
-        style={{
-          marginTop: 20,
-          backgroundColor: "#1E4E8C",
-          paddingVertical: 12,
-          paddingHorizontal: 20,
-          borderRadius: 12,
-        }}
-      >
-        <Text style={{ color: "white", fontWeight: "700" }}>
-          Continue (Mock Login)
-        </Text>
-      </Pressable>
+        style={{ marginTop: 18, alignSelf: "stretch" }}
+      />
     </View>
   );
 }
