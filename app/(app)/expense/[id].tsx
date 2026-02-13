@@ -3,18 +3,13 @@ import { useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import AppButton from "../../../src/components/AppButton";
 import AppText from "../../../src/components/AppText";
-import { useActivity } from "../../../src/context/ActivityContext";
 import { colors } from "../../../src/theme/colors";
-import { useAuth } from "../../../src/context/AuthContext";
 import { useExpenses } from "../../../src/context/ExpensesContext";
+import { useAuth } from "../../../src/context/AuthContext";
 import type { ExpenseStatus } from "../../../src/types/expense";
 
 function formatAmount(value: number) {
   return Number.isInteger(value) ? `€${value}` : `€${value.toFixed(2)}`;
-}
-
-function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString();
 }
 
 function statusLabel(status: ExpenseStatus) {
@@ -27,9 +22,8 @@ export default function ExpenseDetails() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const expenseId = Array.isArray(id) ? id[0] : id;
 
-  const { currentUser } = useAuth();
-  const { events } = useActivity();
   const { expenses, markAsPaid, confirmPayments } = useExpenses();
+  const { currentUser } = useAuth();
 
   const expense = useMemo(() => {
     if (!expenseId) return undefined;
@@ -55,21 +49,31 @@ export default function ExpenseDetails() {
   }
 
   const isPayer = expense.paidBy === currentUser;
-  const expenseKey = `${expense.title} (${expense.period})`;
-  const historyEvents = useMemo(
-    () =>
-      [...events]
-        .filter(
-          (event) =>
-            event.flatId === expense.flatId && event.message.includes(expenseKey)
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )
-        .slice(0, 5),
-    [events, expense.flatId, expenseKey]
-  );
+
+  const myShare = expense.shares.find((s) => s.user === currentUser);
+  const myShareStatus = myShare?.status;
+
+  const claimedCount = expense.shares.filter((s) => s.status === "claimed_paid").length;
+  const confirmedCount = expense.shares.filter((s) => s.status === "confirmed").length;
+  const totalShares = expense.shares.length;
+
+  const allConfirmed = totalShares > 0 && confirmedCount === totalShares;
+  const anyClaimed = claimedCount > 0;
+
+  // Disable rules
+  const disableConfirm = !anyClaimed || allConfirmed; // payer cannot confirm if nothing claimed OR already all confirmed
+  const disableIPaid =
+    !myShare || myShareStatus === "claimed_paid" || myShareStatus === "confirmed" || allConfirmed;
+
+  // UX copy
+  const statusLine = allConfirmed
+    ? "All confirmed ✅"
+    : anyClaimed
+      ? "Waiting for payer confirmation"
+      : "No one has claimed paid yet";
+
+  const actionTitle = isPayer ? "Confirm payment" : "I paid";
+  const actionDisabled = isPayer ? disableConfirm : disableIPaid;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -81,6 +85,12 @@ export default function ExpenseDetails() {
           {formatAmount(expense.amount)}
         </AppText>
         <AppText style={styles.paidBy}>Paid by {expense.paidBy}</AppText>
+
+        <View style={styles.statusPill}>
+          <AppText weight="semibold" style={styles.statusPillText}>
+            {statusLine}
+          </AppText>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -96,6 +106,7 @@ export default function ExpenseDetails() {
             >
               <AppText weight="semibold" style={styles.shareName}>
                 {share.user}
+                {share.user === currentUser ? " (You)" : ""}
               </AppText>
 
               <View style={styles.shareRight}>
@@ -118,8 +129,7 @@ export default function ExpenseDetails() {
                       styles.badgeText,
                       share.status === "confirmed" && styles.badgeTextConfirmed,
                       share.status === "pending" && styles.badgeTextPending,
-                      share.status === "claimed_paid" &&
-                        styles.badgeTextClaimedPaid,
+                      share.status === "claimed_paid" && styles.badgeTextClaimedPaid,
                       share.status === "disputed" && styles.badgeTextDisputed,
                     ]}
                   >
@@ -130,6 +140,22 @@ export default function ExpenseDetails() {
             </View>
           ))}
         </View>
+
+        <AppText style={styles.sharesHint}>
+          {allConfirmed
+            ? "Everyone is confirmed for this expense."
+            : isPayer
+              ? anyClaimed
+                ? `You can confirm ${claimedCount} claimed payment(s).`
+                : "No claimed payments to confirm yet."
+              : myShareStatus === "pending"
+                ? "Mark yourself as paid once you’ve sent the money."
+                : myShareStatus === "claimed_paid"
+                  ? "You marked as paid — waiting for payer confirmation."
+                  : myShareStatus === "confirmed"
+                    ? "Your payment is confirmed."
+                    : "You are not included in this split."}
+        </AppText>
       </View>
 
       <View style={styles.section}>
@@ -138,82 +164,73 @@ export default function ExpenseDetails() {
         </AppText>
 
         <AppButton
-          title={isPayer ? "Confirm payment" : "I paid"}
+          title={actionTitle}
+          disabled={actionDisabled}
           onPress={() => {
             if (!expenseId) return;
 
-            if (!isPayer) {
-              markAsPaid(expenseId, currentUser);
-            } else {
+            if (isPayer) {
+              if (disableConfirm) return;
               confirmPayments(expenseId);
+            } else {
+              if (disableIPaid) return;
+              markAsPaid(expenseId, currentUser);
             }
           }}
-          style={styles.actionButton}
+          style={[
+            styles.actionButton,
+            actionDisabled && styles.actionButtonDisabled,
+          ]}
         />
-      </View>
 
-      <View style={styles.section}>
-        <AppText weight="semibold" style={styles.sectionTitle}>
-          History
-        </AppText>
-
-        <View style={styles.card}>
-          {historyEvents.length === 0 ? (
-            <View style={styles.historyRow}>
-              <AppText style={styles.historyTitle}>
-                No activity for this expense yet.
-              </AppText>
-            </View>
-          ) : (
-            historyEvents.map((event, index) => (
-              <View
-                key={event.id}
-                style={[styles.historyRow, index > 0 && styles.rowBorder]}
-              >
-                <AppText style={styles.historyTitle}>{event.message}</AppText>
-                <AppText style={styles.historyTimestamp}>
-                  {formatTimestamp(event.createdAt)}
-                </AppText>
-              </View>
-            ))
-          )}
-        </View>
+        {actionDisabled ? (
+          <AppText style={styles.disabledHint}>
+            {isPayer
+              ? allConfirmed
+                ? "All payments are already confirmed."
+                : "No roommate has claimed paid yet."
+              : myShareStatus === "pending"
+                ? ""
+                : myShareStatus === "claimed_paid"
+                  ? "You already claimed paid. Wait for confirmation."
+                  : myShareStatus === "confirmed"
+                    ? "Your payment is already confirmed."
+                    : "You are not part of this split."}
+          </AppText>
+        ) : null}
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1, backgroundColor: colors.background },
+  content: { padding: 20, paddingBottom: 32, gap: 18 },
+
+  section: { gap: 10 },
+
+  header: { fontSize: 26, color: colors.text },
+  amount: { marginTop: 2, fontSize: 24, color: colors.text },
+  paidBy: { fontSize: 15, color: colors.text, opacity: 0.72 },
+
+  statusPill: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.background,
+    marginTop: 4,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 32,
-    gap: 18,
-  },
-  section: {
-    gap: 10,
-  },
-  header: {
-    fontSize: 26,
+  statusPillText: {
+    fontSize: 12,
     color: colors.text,
+    opacity: 0.85,
   },
-  amount: {
-    marginTop: 2,
-    fontSize: 24,
-    color: colors.text,
-  },
-  paidBy: {
-    fontSize: 15,
-    color: colors.text,
-    opacity: 0.72,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    color: colors.text,
-  },
+
+  sectionTitle: { fontSize: 17, color: colors.text },
+
   card: {
     backgroundColor: colors.background,
     borderColor: colors.border,
@@ -229,78 +246,49 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 10,
   },
-  rowBorder: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  shareName: {
-    color: colors.text,
-    fontSize: 15,
-  },
-  shareRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  shareAmount: {
-    color: colors.text,
-    fontSize: 14,
-  },
+  rowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
+
+  shareName: { color: colors.text, fontSize: 15 },
+  shareRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  shareAmount: { color: colors.text, fontSize: 14 },
+
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
   },
-  badgeText: {
-    fontSize: 12,
-  },
-  badgeConfirmed: {
-    backgroundColor: "#EAF7EF",
-    borderColor: "#CBE8D7",
-  },
-  badgePending: {
-    backgroundColor: "#FFF7E8",
-    borderColor: colors.warning,
-  },
-  badgeClaimedPaid: {
-    backgroundColor: "#EAF0FF",
-    borderColor: "#C9D7FF",
-  },
-  badgeDisputed: {
-    backgroundColor: "#FEE2E2",
-    borderColor: colors.danger,
-  },
-  badgeTextConfirmed: {
-    color: "#246A43",
-  },
-  badgeTextPending: {
-    color: "#5E3B00",
-  },
-  badgeTextClaimedPaid: {
-    color: "#27468A",
-  },
-  badgeTextDisputed: {
-    color: "#7F1D1D",
-  },
-  actionButton: {
-    marginTop: 2,
-    alignSelf: "stretch",
-  },
-  historyRow: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 4,
-  },
-  historyTitle: {
+  badgeText: { fontSize: 12 },
+
+  badgeConfirmed: { backgroundColor: "#EAF7EF", borderColor: "#CBE8D7" },
+  badgePending: { backgroundColor: "#FFF7E8", borderColor: colors.warning },
+  badgeClaimedPaid: { backgroundColor: "#EAF0FF", borderColor: "#C9D7FF" },
+  badgeDisputed: { backgroundColor: "#FEE2E2", borderColor: colors.danger },
+
+  badgeTextConfirmed: { color: "#246A43" },
+  badgeTextPending: { color: "#5E3B00" },
+  badgeTextClaimedPaid: { color: "#27468A" },
+  badgeTextDisputed: { color: "#7F1D1D" },
+
+  sharesHint: {
     color: colors.text,
-    fontSize: 14,
+    opacity: 0.65,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
   },
-  historyTimestamp: {
+
+  actionButton: { marginTop: 2, alignSelf: "stretch" },
+  actionButtonDisabled: { opacity: 0.55 },
+
+  disabledHint: {
+    marginTop: 8,
     color: colors.text,
     opacity: 0.6,
     fontSize: 12,
+    lineHeight: 16,
   },
+
   emptyState: {
     flex: 1,
     backgroundColor: colors.background,
@@ -308,19 +296,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 24,
   },
-  emptyTitle: {
-    color: colors.text,
-    fontSize: 24,
-    textAlign: "center",
-  },
+  emptyTitle: { color: colors.text, fontSize: 24, textAlign: "center" },
   emptySubtitle: {
     marginTop: 8,
     color: colors.text,
     opacity: 0.7,
     textAlign: "center",
   },
-  emptyButton: {
-    marginTop: 20,
-    alignSelf: "stretch",
-  },
+  emptyButton: { marginTop: 20, alignSelf: "stretch" },
 });

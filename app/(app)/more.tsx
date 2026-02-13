@@ -2,10 +2,8 @@ import { useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import AppButton from "../../src/components/AppButton";
 import AppText from "../../src/components/AppText";
-import { useAuth, type AuthUser } from "../../src/context/AuthContext";
+import { useAuth } from "../../src/context/AuthContext";
 import { colors } from "../../src/theme/colors";
-
-const mockUsers: AuthUser[] = ["Arber", "Mark", "Driton"];
 
 export default function More() {
   const router = useRouter();
@@ -13,61 +11,70 @@ export default function More() {
 
   return (
     <View style={styles.container}>
-      <AppText weight="bold" style={styles.title}>
-        More
-      </AppText>
-      <AppText style={styles.subtitle}>
-        Responsibilities, Notifications, History.
-      </AppText>
+      <View style={styles.header}>
+        <AppText weight="bold" style={styles.title}>
+          More
+        </AppText>
+        <AppText style={styles.subtitle}>Settings and tools</AppText>
+      </View>
 
       <View style={styles.section}>
         <AppText weight="semibold" style={styles.sectionTitle}>
-          Dev user switcher
+          Switch user (dev)
         </AppText>
-        <AppText style={styles.selectedUser}>
-          Current user: {currentUser}
-        </AppText>
-        <View style={styles.userButtons}>
-          {mockUsers.map((user) => (
-            <AppButton
-              key={user}
-              title={user}
-              variant={currentUser === user ? "primary" : "ghost"}
-              onPress={() => setCurrentUser(user)}
-              style={styles.userButton}
-            />
-          ))}
+
+        <View style={styles.buttonStack}>
+          <AppButton
+            title="Driton"
+            onPress={() => setCurrentUser("Driton")}
+            variant={currentUser === "Driton" ? "primary" : "neutral"}
+          />
+          <AppButton
+            title="Arber"
+            onPress={() => setCurrentUser("Arber")}
+            variant={currentUser === "Arber" ? "primary" : "neutral"}
+          />
+          <AppButton
+            title="Mark"
+            onPress={() => setCurrentUser("Mark")}
+            variant={currentUser === "Mark" ? "primary" : "neutral"}
+          />
         </View>
       </View>
 
       <View style={styles.section}>
         <AppText weight="semibold" style={styles.sectionTitle}>
-          Navigation
+          Flat
         </AppText>
-        <View style={styles.navButtons}>
+        <View style={styles.buttonStack}>
           <AppButton
-            title="Flat"
-            variant="ghost"
+            title="Manage flat"
             onPress={() => router.push("/(app)/flat")}
-            style={styles.navButton}
+            variant="neutral"
           />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <AppText weight="semibold" style={styles.sectionTitle}>
+          Other
+        </AppText>
+
+        <View style={styles.buttonStack}>
           <AppButton
             title="Responsibilities"
-            variant="ghost"
             onPress={() => router.push("/(app)/responsibilities")}
-            style={styles.navButton}
+            variant="neutral"
           />
           <AppButton
             title="Notifications"
-            variant="ghost"
             onPress={() => router.push("/(app)/notifications")}
-            style={styles.navButton}
+            variant="neutral"
           />
           <AppButton
             title="History"
-            variant="ghost"
             onPress={() => router.push("/(app)/history")}
-            style={styles.navButton}
+            variant="neutral"
           />
         </View>
       </View>
@@ -79,39 +86,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    gap: 18,
   },
+  header: {},
   title: {
-    fontSize: 22,
+    fontSize: 28,
     color: colors.text,
   },
   subtitle: {
-    marginTop: 8,
+    marginTop: 6,
+    fontSize: 15,
     color: colors.text,
-    opacity: 0.7,
+    opacity: 0.65,
   },
   section: {
-    marginTop: 22,
     gap: 10,
   },
   sectionTitle: {
     fontSize: 16,
     color: colors.text,
   },
-  selectedUser: {
-    color: colors.text,
-    opacity: 0.8,
-  },
-  userButtons: {
-    gap: 8,
-  },
-  userButton: {
-    alignSelf: "stretch",
-  },
-  navButtons: {
+  buttonStack: {
     gap: 10,
-  },
-  navButton: {
-    alignSelf: "stretch",
   },
 });

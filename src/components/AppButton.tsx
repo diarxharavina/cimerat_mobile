@@ -1,54 +1,118 @@
-import { Pressable, StyleSheet, ViewStyle } from "react-native";
+import React from "react";
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  ViewStyle,
+} from "react-native";
 import { colors } from "../theme/colors";
-import AppText from "./AppText";
+
+type Variant = "primary" | "neutral" | "outline" | "danger" | "ghost";
 
 type Props = {
   title: string;
-  onPress?: () => void;
-  variant?: "primary" | "ghost";
-  style?: ViewStyle;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  disabled?: boolean;
+  variant?: Variant;
 };
 
-export default function AppButton({ title, onPress, variant = "primary", style }: Props) {
+export default function AppButton({
+  title,
+  onPress,
+  style,
+  disabled,
+  variant = "primary",
+}: Props) {
   return (
     <Pressable
-      onPress={onPress}
-      style={[
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
         styles.base,
-        variant === "primary" ? styles.primary : styles.ghost,
+        variant === "primary" && styles.primary,
+        variant === "neutral" && styles.neutral,
+        variant === "outline" && styles.outline,
+        variant === "danger" && styles.danger,
+        variant === "ghost" && styles.ghost,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
         style,
       ]}
     >
-      <AppText weight="bold" style={[styles.text, variant === "primary" ? styles.textPrimary : styles.textGhost]}>
+      <Text
+        style={[
+          styles.textBase,
+          (variant === "primary" || variant === "danger") && styles.textOnFill,
+          (variant === "neutral" || variant === "outline") && styles.textNeutral,
+          variant === "ghost" && styles.textGhost,
+        ]}
+      >
         {title}
-      </AppText>
+      </Text>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
+
   primary: {
     backgroundColor: colors.primary,
   },
-  ghost: {
+
+  danger: {
+    backgroundColor: colors.danger,
+  },
+
+  neutral: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  outline: {
     backgroundColor: "transparent",
     borderWidth: 1,
     borderColor: colors.border,
   },
-  text: {
-    fontSize: 15,
+
+  // "ghost" = text-only, no border, no fill
+  ghost: {
+    backgroundColor: "transparent",
+    paddingVertical: 10,
   },
-  textPrimary: {
+
+  pressed: {
+    opacity: 0.9,
+  },
+
+  disabled: {
+    opacity: 0.55,
+  },
+
+  textBase: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  textOnFill: {
     color: "white",
   },
+
+  textNeutral: {
+    color: colors.text,
+  },
+
   textGhost: {
     color: colors.text,
+    opacity: 0.8,
   },
 });

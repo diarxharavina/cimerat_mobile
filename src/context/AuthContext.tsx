@@ -1,28 +1,66 @@
-import { createContext, useContext, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-export type AuthUser = "Arber" | "Mark" | "Driton";
+export type UserName = "Arber" | "Mark" | "Driton";
 
 type AuthContextType = {
-  currentUser: AuthUser;
-  setCurrentUser: (user: AuthUser) => void;
+  currentUser: UserName;
+  setCurrentUser: (user: UserName) => void;
+  isHydrated: boolean; // true after we load from storage
 };
+
+const STORAGE_KEY = "cimerat.auth.currentUser";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<AuthUser>("Driton");
+  const [currentUser, setCurrentUserState] = useState<UserName>("Driton");
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  return (
-    <AuthContext.Provider value={{ currentUser, setCurrentUser }}>
-      {children}
-    </AuthContext.Provider>
+  // Load once on app start
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!mounted) return;
+
+        if (stored === "Arber" || stored === "Mark" || stored === "Driton") {
+          setCurrentUserState(stored);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) setIsHydrated(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Persist on change (after hydration)
+  useEffect(() => {
+    if (!isHydrated) return;
+    AsyncStorage.setItem(STORAGE_KEY, currentUser).catch(() => {});
+  }, [currentUser, isHydrated]);
+
+  const value = useMemo(
+    () => ({
+      currentUser,
+      setCurrentUser: setCurrentUserState,
+      isHydrated,
+    }),
+    [currentUser, isHydrated]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 }

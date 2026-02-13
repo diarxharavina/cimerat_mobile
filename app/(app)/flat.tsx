@@ -112,12 +112,17 @@ export default function FlatScreen() {
         <AppButton title="Join Flat" onPress={handleJoinFlat} style={styles.fullButton} />
       </View>
 
-      <View style={styles.card}>
-        <AppText weight="semibold" style={styles.cardTitle}>
-          Leave Flat
-        </AppText>
-        <AppButton title="Leave Flat" variant="ghost" onPress={handleLeaveFlat} style={styles.fullButton} />
-      </View>
+      {currentFlat ? (
+        <View style={styles.leaveWrap}>
+          <AppButton
+            title="Leave Flat"
+            onPress={handleLeaveFlat}
+            variant="danger"
+            style={styles.leaveButton}
+          />
+        </View>
+      ) : null}
+
 
       {message ? <AppText style={styles.message}>{message}</AppText> : null}
     </ScrollView>
@@ -186,4 +191,13 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     fontSize: 13,
   },
+  leaveWrap: {
+    paddingTop: 18,
+    paddingBottom: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  leaveButton: {
+    alignSelf: "stretch",
+  },  
 });

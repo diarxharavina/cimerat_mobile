@@ -1,4 +1,5 @@
-import { createContext, useContext, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Expense, ExpenseStatus, Share } from "../types/expense";
 import { mockExpenses } from "../data/mockExpenses";
 import { useActivity } from "./ActivityContext";
@@ -8,24 +9,66 @@ type ExpensesContextType = {
   addExpense: (expense: Expense) => void;
   markAsPaid: (expenseId: string, user: string) => void;
   confirmPayments: (expenseId: string) => void;
+  isHydrated: boolean;
 };
+
+const STORAGE_KEY = "cimerat.expenses.state";
 
 const ExpensesContext = createContext<ExpensesContextType | undefined>(undefined);
 
+function formatAmount(value: number) {
+  return Number.isInteger(value) ? `€${value}` : `€${value.toFixed(2)}`;
+}
+
 export function ExpensesProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>(mockExpenses);
+  const [isHydrated, setIsHydrated] = useState(false);
   const { logEvent } = useActivity();
 
-  function formatAmount(value: number) {
-    return Number.isInteger(value) ? `€${value}` : `€${value.toFixed(2)}`;
-  }
+  // Load once on startup
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!mounted) return;
+
+        if (raw) {
+          const parsed = JSON.parse(raw) as Expense[];
+          if (Array.isArray(parsed)) {
+            // Basic sanity check: must have id/title fields if non-empty
+            if (parsed.length === 0 || (parsed[0] && typeof parsed[0].id === "string")) {
+              setExpenses(parsed);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (mounted) setIsHydrated(true);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Persist on change (after hydration)
+  useEffect(() => {
+    if (!isHydrated) return;
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(expenses)).catch(() => {});
+  }, [expenses, isHydrated]);
 
   function addExpense(expense: Expense) {
     setExpenses((prev) => [expense, ...prev]);
     logEvent({
       flatId: expense.flatId,
       type: "expense_created",
-      message: `${expense.paidBy} created ${expense.title} (${expense.period}) for ${formatAmount(expense.amount)}`,
+      message: `${expense.paidBy} created ${expense.title} (${expense.period}) for ${formatAmount(
+        expense.amount
+      )}`,
     });
   }
 
@@ -38,10 +81,10 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     );
 
     setExpenses((prev) =>
-      prev.map((expense) => {
-        if (expense.id !== expenseId) return expense;
+      prev.map((exp) => {
+        if (exp.id !== expenseId) return exp;
 
-        const updatedShares: Share[] = expense.shares.map((share) => {
+        const updatedShares: Share[] = exp.shares.map((share) => {
           if (share.user === user && share.status === "pending") {
             const newStatus: ExpenseStatus = "claimed_paid";
             return { ...share, status: newStatus };
@@ -49,7 +92,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
           return share;
         });
 
-        return { ...expense, shares: updatedShares };
+        return { ...exp, shares: updatedShares };
       })
     );
 
@@ -69,10 +112,10 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     const claimedShares = expense.shares.filter((share) => share.status === "claimed_paid");
 
     setExpenses((prev) =>
-      prev.map((expense) => {
-        if (expense.id !== expenseId) return expense;
+      prev.map((exp) => {
+        if (exp.id !== expenseId) return exp;
 
-        const updatedShares: Share[] = expense.shares.map((share) => {
+        const updatedShares: Share[] = exp.shares.map((share) => {
           if (share.status === "claimed_paid") {
             const newStatus: ExpenseStatus = "confirmed";
             return { ...share, status: newStatus };
@@ -80,7 +123,7 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
           return share;
         });
 
-        return { ...expense, shares: updatedShares };
+        return { ...exp, shares: updatedShares };
       })
     );
 
@@ -93,19 +136,16 @@ export function ExpensesProvider({ children }: { children: React.ReactNode }) {
     });
   }
 
-  return (
-    <ExpensesContext.Provider
-      value={{ expenses, addExpense, markAsPaid, confirmPayments }}
-    >
-      {children}
-    </ExpensesContext.Provider>
+  const value = useMemo(
+    () => ({ expenses, addExpense, markAsPaid, confirmPayments, isHydrated }),
+    [expenses, isHydrated]
   );
+
+  return <ExpensesContext.Provider value={value}>{children}</ExpensesContext.Provider>;
 }
 
 export function useExpenses() {
   const context = useContext(ExpensesContext);
-  if (!context) {
-    throw new Error("useExpenses must be used within ExpensesProvider");
-  }
+  if (!context) throw new Error("useExpenses must be used within ExpensesProvider");
   return context;
 }
